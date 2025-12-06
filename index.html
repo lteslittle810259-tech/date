@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>可愛倒數日 - 互動版</title>
+  <style>
+    :root{
+      --bg-1: #ffeef8; /* pastel pink */
+      --bg-2: #fff7e6; /* pastel yellow */
+      --accent: #ff6fb5;
+      --accent-2: #ffd166;
+      --card-bg: rgba(255,255,255,0.85);
+      --glass: rgba(255,255,255,0.6);
+      --shadow: 0 6px 18px rgba(17,17,17,0.08);
+      --max-days: 100; /* default for progress calc if target earlier than today */
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(135deg,var(--bg-1),var(--bg-2));
+      transition:background 800ms ease;
+      padding:24px;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:940px;
+      background:var(--card-bg);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:28px;
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:20px;
+      align-items:start;
+    }
+
+    /* Left column: ring + big days */
+    .left{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:18px;
+    }
+
+    .ring-wrap{position:relative;width:260px;height:260px}
+    svg{display:block}
+    .center-num{
+      position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      pointer-events:none;
+    }
+    .days{
+      font-size:48px;font-weight:700;letter-spacing:1px;color:#333;
+    }
+    .label{font-size:14px;color:#666;margin-top:6px}
+
+    .controls{width:100%;display:flex;flex-direction:column;gap:10px}
+    .field{display:flex;gap:10px;align-items:center}
+    input[type=date]{padding:10px;border-radius:8px;border:1px dashed rgba(0,0,0,0.08);background:transparent}
+    button{padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:600;cursor:pointer}
+    button.secondary{background:var(--accent-2);color:#4a2f02}
+
+    /* Right column: quote + custom */
+    .right{display:flex;flex-direction:column;gap:14px}
+    .quote-card{background:var(--glass);padding:18px;border-radius:12px;min-height:120px;display:flex;flex-direction:column;justify:center;align-items:flex-start;position:relative}
+    .quote-text{font-size:20px;font-weight:600;color:#3b2b36;line-height:1.4}
+    .quote-meta{font-size:12px;color:#6b5b6e;margin-top:8px}
+
+    .small{font-size:13px;color:#5a4b56}
+
+    .custom-area{display:flex;gap:8px}
+    textarea{width:100%;height:72px;padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);resize:none}
+
+    .list{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto;padding-right:6px}
+    .item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.9);display:flex;justify-content:space-between;align-items:center}
+    .item .txt{font-size:13px;color:#4a3a4b}
+    .item button{background:transparent;border:0;color:#d45f7a;cursor:pointer}
+
+    footer{margin-top:6px;font-size:12px;color:#4f3f4b}
+
+    /* typewriter */
+    .typewriter{overflow:hidden;border-right:3px solid rgba(0,0,0,0.08);white-space:nowrap;width:100%;}
+    @keyframes typing{from{width:0}to{width:100%}}
+    @keyframes blink{50%{border-color:transparent}}
+
+    .typewriter .text{display:inline-block;}
+    .typewriter.play .text{animation:typing 1.6s steps(30,end) forwards}
+    .typewriter.play{animation:blink 1s step-end infinite}
+
+    /* responsive */
+    @media (max-width:880px){
+      .wrap{grid-template-columns:1fr;}
+      .left{order:2}
+      .right{order:1}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="left">
+      <div class="ring-wrap" aria-hidden>
+        <svg width="260" height="260" viewBox="0 0 120 120">
+          <defs>
+            <linearGradient id="g" x1="0" x2="1">
+              <stop offset="0%" stop-color="#ffdce6" />
+              <stop offset="100%" stop-color="#ffb3d1" />
+            </linearGradient>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="transparent" stroke="#f4e9f1" stroke-width="12" />
+          <circle id="progress" cx="60" cy="60" r="52" fill="transparent" stroke="url(#g)" stroke-width="12" stroke-linecap="round" transform="rotate(-90 60 60)" stroke-dasharray="326.7256" stroke-dashoffset="326.7256" />
+        </svg>
+        <div class="center-num">
+          <div class="days" id="days">--</div>
+          <div class="label">天剩下</div>
+        </div>
+      </div>
+
+      <div class="controls" aria-label="controls">
+        <div class="field">
+          <input id="targetDate" type="date" />
+          <button id="saveBtn">設定</button>
+        </div>
+        <div class="field">
+          <button id="clearBtn" class="secondary">重設</button>
+          <div style="flex:1;text-align:right" class="small">進度會隨天數自動更新</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="right">
+      <div class="quote-card">
+        <div class="typewriter" id="quoteBox">
+          <div class="text" id="quoteText">載入中⋯</div>
+        </div>
+        <div class="quote-meta" id="quoteMeta">今天的激勵</div>
+      </div>
+
+      <div>
+        <div class="small">自訂激勵語（可新增，會儲存在你的瀏覽器）</div>
+        <div class="custom-area" style="margin-top:8px">
+          <textarea id="newQuote" placeholder="寫下一句你喜歡的鼓勵話（按加入）"></textarea>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button id="addQuote">加入</button>
+            <button id="insertDefault" class="secondary">恢復預設庫</button>
+          </div>
+        </div>
+
+        <div class="list" id="quoteList" style="margin-top:12px"></div>
+      </div>
+
+      <footer>
+        Tip：背景會隨進度從柔和變亮，越接近目標越亮眼 ✨ &nbsp; • &nbsp; 將整個檔案另存為 <code>countdown.html</code> 並開啟即可
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    /* 初始預設語錄 */
+    const defaultQuotes = [
+      "今天的你比昨天更靠近目標。",
+      "一步一腳印，勝過空想。",
+      "你值得為自己驕傲。",
+      "別怕慢，只怕停下來。",
+      "每個小努力都會成為未來的你。",
+      "笑一個，困難看起來沒那麼大。",
+      "相信自己，你比想像中更強。",
+      "把大目標分成小任務，逐一完成。",
+      "勇敢嘗試就是勝利的一半。",
+      "今天的堅持會成為明天的驕傲。"
+    ];
+
+    // helpers
+    const $ = id => document.getElementById(id);
+
+    const STORAGE_KEY = 'cute_countdown_v1';
+
+    function loadState(){
+      try{const raw = localStorage.getItem(STORAGE_KEY);return raw?JSON.parse(raw):{target:null,customQuotes:[]} }catch(e){return {target:null,customQuotes:[]}}
+    }
+    function saveState(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}
+
+    const state = loadState();
+
+    // combine quotes: default + custom
+    function allQuotes(){
+      return [...defaultQuotes, ...(state.customQuotes || [])];
+    }
+
+    // date helpers
+    function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
+
+    function daysBetween(a,b){ // b - a in days (int)
+      const ms = 1000*60*60*24;
+      return Math.ceil((startOfDay(b)-startOfDay(a))/ms);
+    }
+
+    function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+    // UI elements
+    const daysEl = $('days');
+    const progressEl = document.getElementById('progress');
+    const targetDateInput = $('targetDate');
+    const saveBtn = $('saveBtn');
+    const clearBtn = $('clearBtn');
+    const quoteText = $('quoteText');
+    const quoteBox = $('quoteBox');
+    const quoteList = $('quoteList');
+    const newQuote = $('newQuote');
+    const addQuote = $('addQuote');
+    const insertDefault = $('insertDefault');
+
+    // init
+    if(state.target){
+      targetDateInput.value = state.target;
+    }
+
+    function pickQuoteForToday(){
+      const quotes = allQuotes();
+      if(!quotes.length) return '（尚無激勵語）';
+      const now = new Date();
+      const idx = (now.getFullYear()*10000 + (now.getMonth()+1)*100 + now.getDate()) % quotes.length;
+      return quotes[idx];
+    }
+
+    function renderQuote(){
+      const q = pickQuoteForToday();
+      // typewriter effect restart
+      quoteText.textContent = q;
+      quoteBox.classList.remove('play');
+      // small timeout to restart CSS animation
+      setTimeout(()=>quoteBox.classList.add('play'),40);
+    }
+
+    function renderList(){
+      const quotes = allQuotes();
+      quoteList.innerHTML = quotes.map((q,i)=>{
+        return `<div class="item"><div class="txt">${escapeHtml(q)}</div><div><button data-i="${i}" class="delBtn">✕</button></div></div>`
+      }).join('');
+      // attach delete events (only allowed for custom ones - index after default)
+      const dels = quoteList.querySelectorAll('.delBtn');
+      dels.forEach(btn=>{
+        btn.addEventListener('click',e=>{
+          const i = Number(btn.dataset.i);
+          const defLen = defaultQuotes.length;
+          if(i < defLen){alert('無法刪除系統預設語錄');return}
+          const customIndex = i - defLen;
+          state.customQuotes.splice(customIndex,1);
+          saveState(state);
+          renderList();
+          renderQuote();
+        })
+      })
+    }
+
+    function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+    function updateCountdownUI(){
+      const today = new Date();
+      let daysLeft = '--';
+      let progress = 0;
+      if(state.target){
+        const target = new Date(state.target+ 'T00:00:00');
+        const diff = Math.ceil((startOfDay(target)-startOfDay(today))/(1000*60*60*24));
+        daysLeft = diff >= 0 ? diff : 0;
+
+        // total days: from today to target initially when user set it
+        const initialTotal = Math.max(1, Math.ceil((startOfDay(new Date(state.target)) - startOfDay(new Date(state.setOn || state.target)))/(1000*60*60*24)));
+        // fallback: use default max
+        const total = initialTotal || parseInt(getComputedStyle(document.documentElement).getPropertyValue('--max-days')) || 100;
+
+        // progress: 0 (far) -> 1 (arrived) ; we invert because nearer => brighter
+        const passed = total - daysLeft;
+        progress = clamp(passed/total,0,1);
+
+        // visual: set days text
+        daysEl.textContent = daysLeft;
+
+      }else{
+        daysEl.textContent = '--';
+        progress = 0;
+      }
+
+      // update SVG stroke-dashoffset
+      const circumference = 2*Math.PI*52; // r=52
+      const offset = circumference * (1 - progress);
+      progressEl.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.2,.9,.2,1)';
+      progressEl.style.strokeDashoffset = offset;
+
+      // update background brightness / gradient based on progress (near -> brighter)
+      // We'll mix two pastel gradients: base and 'bright' and interpolate via opacity
+      const brightPct = Math.round(progress*100);
+      // compute CSS background with more intense colors as progress increases
+      const soft1 = '#ffeef8';
+      const soft2 = '#fff7e6';
+      const bright1 = '#fff8ec';
+      const bright2 = '#fff3d9';
+
+      // simpler: adjust body opacity overlay
+      const body = document.body;
+      // set a subtle filter and overlay brightness
+      const sat = 0.9 + progress*0.3;
+      const light = 1 + progress*0.28;
+      body.style.filter = `saturate(${sat}) brightness(${light})`;
+
+      // small confetti pulse when progress crosses thresholds
+      maybeCelebrate(progress);
+
+      // update quote as well (so each new day shows new quote automatically)
+      renderQuote();
+    }
+
+    // celebrate only when crossing certain thresholds (once per threshold per session)
+    let lastCelebratedLevel = -1;
+    function maybeCelebrate(progress){
+      const level = Math.floor(progress*10); // 0..10
+      if(level > lastCelebratedLevel && progress > 0){
+        lastCelebratedLevel = level;
+        // subtle bounce animation on days
+        daysEl.animate([
+          {transform:'scale(1)'},
+          {transform:'scale(1.06)'},
+          {transform:'scale(1)'}
+        ],{duration:420, easing:'ease-out'});
+      }
+    }
+
+    // actions
+    saveBtn.addEventListener('click',()=>{
+      const v = targetDateInput.value;
+      if(!v){alert('請選擇日期');return}
+      const t = new Date(v+'T00:00:00');
+      if(isNaN(t)) {alert('日期格式錯誤');return}
+      state.target = v;
+      state.setOn = state.setOn || v; // store when first set (for progress baseline)
+      saveState(state);
+      updateCountdownUI();
+      alert('已儲存倒數日期！');
+    });
+
+    clearBtn.addEventListener('click',()=>{
+      if(confirm('確定要移除目標日期與所有自訂語錄嗎？')){
+        localStorage.removeItem(STORAGE_KEY);
+        state.target = null; state.customQuotes = []; state.setOn = null;
+        targetDateInput.value = '';
+        renderList();
+        updateCountdownUI();
+      }
+    });
+
+    addQuote.addEventListener('click',()=>{
+      const v = newQuote.value.trim();
+      if(!v) return;
+      state.customQuotes = state.customQuotes || [];
+      state.customQuotes.push(v);
+      saveState(state);
+      newQuote.value = '';
+      renderList();
+      renderQuote();
+    });
+
+    insertDefault.addEventListener('click',()=>{
+      if(confirm('會清除所有自訂語錄，並回復系統預設語錄，確定嗎？')){
+        state.customQuotes = [];
+        saveState(state);
+        renderList();
+        renderQuote();
+      }
+    });
+
+    // render list once
+    renderList();
+
+    // initial render
+    updateCountdownUI();
+
+    // re-calc every minute in case user leaves page open across midnight
+    setInterval(updateCountdownUI,60*1000);
+
+    // popup quote once per day (store lastShownDate in localStorage)
+    function showDailyPopupIfNeeded(){
+      try{
+        const k = 'cute_countdown_last_shown';
+        const todayKey = (new Date()).toISOString().slice(0,10);
+        const last = localStorage.getItem(k);
+        if(last !== todayKey){
+          // briefly animate quote box
+          quoteBox.animate([{opacity:0, transform:'translateY(6px)'},{opacity:1, transform:'translateY(0)'}],{duration:420,easing:'ease-out'});
+          localStorage.setItem(k,todayKey);
+        }
+      }catch(e){/* ignore */}
+    }
+    showDailyPopupIfNeeded();
+
+    // util: initialize default customQuotes if none but keep existing
+    if(!Array.isArray(state.customQuotes)) state.customQuotes = [];
+
+    // accessibility: keyboard support for date input Enter
+    targetDateInput.addEventListener('keyup',e=>{if(e.key==='Enter') saveBtn.click()});
+
+    // handy: clicking quote rotates to next quote immediately
+    quoteText.parentElement.addEventListener('click',()=>{
+      // rotate index by 1 based on today's index
+      const quotes = allQuotes();
+      if(!quotes.length) return;
+      const now = new Date();
+      let idx = (now.getFullYear()*10000 + (now.getMonth()+1)*100 + now.getDate()) % quotes.length;
+      idx = (idx + 1) % quotes.length;
+      quoteText.textContent = quotes[idx];
+      quoteBox.classList.remove('play');
+      setTimeout(()=>quoteBox.classList.add('play'),40);
+    });
+
+  </script>
+</body>
+</html>
